@@ -1,5 +1,3 @@
-import time
-
 def load_data():
     with open("input/day_11.txt") as f:
         return f.read().split('\n\n')
