@@ -39,20 +39,15 @@ def parse_list(string, i = 0):
                 return result, i+1 
             case number_char:
                 current_number += number_char
-                # print(current_number)
                 i += 1
 
 def check_order(left, right):
-    # print(f"check {left} vs {right}")
     for l, r in zip_longest(left, right):
-        # print(f'compare {l} vs {r}')
         is_ordered = None
         if type(l) == int and type(r) == int:
             if l < r:
-                # print("left smaller than right!")
                 return True
             elif l > r:
-                # print("right larger than left!")
                 return False
         elif type(l) == list and type(r) == list:
             is_ordered = check_order(l, r)
@@ -64,10 +59,8 @@ def check_order(left, right):
             is_ordered = check_order([l], r)
             
         elif l == None:
-            # print("left ran out!")
             return True
         elif r == None:
-            # print("right ran out!")
             return False
 
         if is_ordered != None:
