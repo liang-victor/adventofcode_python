@@ -155,17 +155,15 @@ def dfs(time, valve, open_valves=0):
         if remaining_time <= 0:
             continue
 
-        updated_open_valves = open_valve(open_valves, valve)
+        updated_open_valves = open_valve(open_valves, neighbour)
 
         maximum_flow = max(maximum_flow,
-                           dfs(remaining_time, graph[neighour_name],
-                               updated_open_valves) + neighbour.flow_rate * remaining_time)
+                           dfs(remaining_time, neighbour, updated_open_valves) + neighbour.flow_rate * remaining_time)
 
     return maximum_flow
 
 
 def valve_already_open(open_valves, neighbour):
-    print()
     return open_valves & bitmask(neighbour)
 
 
@@ -188,18 +186,23 @@ def open_valve(open_valves, valve):
 
 
 if __name__ == "__main__":
-    data = load_data("day_16_example")
+    data = load_data("day_16")
     graph = parse(data)
 
     distances = calculate_distances(graph)
-    print(distances)
+    # print(distances)
 
     for index, valve in enumerate(graph.values()):
         if valve.name != 'AA' and valve.flow_rate > 0:
             valve.set_index(index)
 
-    # print(dfs(30, graph["AA"]))
+    import time
 
+    t_start = time.time()
+
+    print(dfs(30, graph["AA"]))
+
+    print(time.time()-t_start)
     # queue = [Path('AA')]
     # next_queue = []
     #
