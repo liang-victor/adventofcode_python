@@ -186,14 +186,16 @@ def open_valve(open_valves, valve):
 
 
 if __name__ == "__main__":
-    data = load_data("day_16")
+    data = load_data("day_16_example")
     graph = parse(data)
 
     distances = calculate_distances(graph)
     # print(distances)
 
-    for index, valve in enumerate(graph.values()):
+    index = -1
+    for valve in graph.values():
         if valve.name != 'AA' and valve.flow_rate > 0:
+            index += 1
             valve.set_index(index)
 
     import time
@@ -202,7 +204,22 @@ if __name__ == "__main__":
 
     print(dfs(30, graph["AA"]))
 
-    print(time.time()-t_start)
+    print(f'Part 1: {time.time()-t_start} s')
+
+
+    # part 2
+    print(index)
+    b = (1 << index) -1
+    print(f'{b:b} - {b}')
+    max_pressure_released = 0
+
+    t_start = time.time()
+    for i in range(b//2):
+        max_pressure_released = max(max_pressure_released, dfs(26, graph['AA'], i) + dfs(26, graph['AA'], b ^ i))
+
+    print(f'Part 2: Max pressure released {max_pressure_released}')
+    print(f'part 2: {time.time() - t_start} s')
+
     # queue = [Path('AA')]
     # next_queue = []
     #
