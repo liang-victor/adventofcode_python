@@ -36,6 +36,18 @@ class Chamber:
     def get_row(self, height):
         return self.rows[height]
 
+    def absorb_rock(self, rock):
+        for chamber_row_number, index in rock.rows.items():
+            existing_chamber_row = self.rows[chamber_row_number]
+            self.rows[chamber_row_number] = existing_chamber_row | rock.generate_bitmask(index)
+
+        # update the highest point of rock
+        self.highest_rock = max(self.highest_rock, max(rock.rows.keys()))
+
+        # add more rows above the high point if necessary
+        if (rows_needed := self.highest_rock + 4 - len(self.rows)) > 0:
+            self.rows.extend([0] * rows_needed)
+
 
 class Rock:
     """
@@ -52,13 +64,13 @@ class Rock:
 
     """
 
-    def __init__(self, height, column, shape, length):
-        self.shape = shape
-        self.height = height
-        self.column = column
-        self.rows = {(self.height + x): x for x in range(len(shape))}
-        self.length = length
+    def __init__(self):
+        self.height = None
+        self.column = None
         self.falling = True
+        self.max_width = None
+        self.shape = None
+        self.rows = None
 
     def __repr__(self):
         return f"rock at {self.height} {self.column}"
@@ -66,7 +78,10 @@ class Rock:
     def generate_bitmask(self, index=0):
 
         # this is going to be different depending on the shape, and which row we're calculating for
-        return self.shape[index] << CHAMBER_WIDTH - 4 - self.column
+        return self.shape[index] << CHAMBER_WIDTH - self.max_width - self.column
+
+    def update_rows(self):
+        self.rows = {(self.height + x): x for x in range(len(self.shape))}
 
     def draw_on(self, string, index=0):
         """Replaces characters in the string if the rock occupies those spaces"""
@@ -82,7 +97,7 @@ class Rock:
 
     def drop(self):
         self.height -= 1
-        self.rows = {(height - 1): index for height, index in self.rows.items()}
+        self.update_rows()
 
     def can_drop(self, chamber):
         # bitwise & to check potential collision
@@ -94,44 +109,79 @@ class Rock:
         return above_ground and not will_collide_below
 
 
-def generate_rock(chamber):
+class HorizontalStick(Rock):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.shape = [int("1111", 2)]
+        self.max_width = 4
+
+
+class Plus(Rock):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.shape = [int("10", 2), int("111", 2), int("10", 2)]
+        self.max_width = 3
+
+
+class ReverseL(Rock):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.shape = [int("111", 2), int("1", 2), int("1", 2)]
+        self.max_width = 3
+
+
+class VerticalStick(Rock):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.shape = [int("1", 2)] * 4
+        self.max_width = 1
+
+
+class Box(Rock):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.shape = [int("11", 2)] * 2
+        self.max_width = 2
+
+
+def rock_cycle():
     while True:
-        height = chamber.highest_rock + 3
+        yield HorizontalStick()
+        yield Plus()
+        yield ReverseL()
+        yield VerticalStick()
+        yield Box()
 
-        # stick = [int("1111", 2) << (CHAMBER_WIDTH - 4 - 2)]
-        rows = []
-        shape = [int("1111", 2)]
 
-        rock = Rock(height=height, column=2, shape=shape, length=4)
+def rock_factory(rock_cycler, start_height, start_column=2):
+    rock = next(rock_cycler)
+    rock.height = start_height
+    rock.column = start_column
+    rock.update_rows()
 
-        yield (rock)
+    return rock
 
 
 if __name__ == '__main__':
     chamber = Chamber()
-    chamber.rows[0] = int("0100001", 2)
-    rock_generator = generate_rock(chamber)
-    rock = next(rock_generator)
+    # chamber.rows[0] = int("0100001", 2)
+    rock_cycler = rock_cycle()
 
-    round = 0
-    print(f'Round {round}')
-    chamber.visualize(rock)
-    print()
+    for round in range(8):
+        rock = rock_factory(rock_cycler, chamber.highest_rock + 3)
+        while rock.falling:
+            rock.drop()
+            if not rock.can_drop(chamber):
+                rock.falling = False
 
-    while rock.falling:
+            # simulate rock pushed by wind
 
-        round += 1
-        print(f'Round {round}')
-        rock.drop()
+            # # check the next iteration before looping around
+            # if not rock.can_drop(chamber):
+            #     rock.falling = False
+        chamber.absorb_rock(rock)
+        # chamber.visualize(None)
 
-        if not rock.can_drop(chamber):
-            rock.falling = False
-
-        # simulate rock pushed by wind
-
-        # # check the next iteration before looping around
-        # if not rock.can_drop(chamber):
-        #     rock.falling = False
         chamber.visualize(rock)
         print()
 
@@ -144,4 +194,3 @@ if __name__ == '__main__':
     # compute drop and wind
     # check if the rock has landed
     # add the rock to the chamber
-    # update the highest rock position
