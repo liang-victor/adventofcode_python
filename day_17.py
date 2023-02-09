@@ -25,9 +25,10 @@ class Chamber:
         for i, row in enumerate(reversed(self.rows)):
             row_number = len(self.rows) - 1 - i
             row_string = f"{row:07b}".replace('0', '·').replace('1', '#')
-            if rock and row_number in rock.rows:
+            if rock and row_number in rock.rows.keys():
+                index = rock.rows.get(row_number)
                 # TODO: render rocks that span multiple rows (do this check differently? store value in rock.rows differently?)
-                row_string = rock.draw_on(row_string, 0)
+                row_string = rock.draw_on(row_string, index)
 
             print(f'|{row_string}|  {row_number}')
         print(f'+{"=" * CHAMBER_WIDTH}+')
@@ -55,7 +56,7 @@ class Rock:
         self.shape = shape
         self.height = height
         self.column = column
-        self.rows = [self.height + x for x in range(len(shape))]
+        self.rows = {(self.height + x): x for x in range(len(shape))}
         self.length = length
         self.falling = True
 
@@ -80,17 +81,15 @@ class Rock:
         return ''.join(chars)
 
     def drop(self):
-
         self.height -= 1
-        self.rows = [h - 1 for h in self.rows]
+        self.rows = {(height - 1): index for height, index in self.rows.items()}
 
     def can_drop(self, chamber):
         # bitwise & to check potential collision
-        print(binary(chamber.get_row(self.height - 1)))
+        # print(binary(chamber.get_row(self.height - 1)))
 
-        print(binary(self.generate_bitmask()))
+        # print(binary(self.generate_bitmask()))
         will_collide_below = chamber.get_row(self.height - 1) & self.generate_bitmask()
-        print(binary(will_collide_below))
         above_ground = self.height > 0
         return above_ground and not will_collide_below
 
@@ -114,12 +113,18 @@ if __name__ == '__main__':
     rock_generator = generate_rock(chamber)
     rock = next(rock_generator)
 
+    round = 0
+    print(f'Round {round}')
     chamber.visualize(rock)
+    print()
 
     while rock.falling:
-        if rock.can_drop(chamber):
-            rock.drop()
-        else:
+
+        round += 1
+        print(f'Round {round}')
+        rock.drop()
+
+        if not rock.can_drop(chamber):
             rock.falling = False
 
         # simulate rock pushed by wind
@@ -128,6 +133,7 @@ if __name__ == '__main__':
         # if not rock.can_drop(chamber):
         #     rock.falling = False
         chamber.visualize(rock)
+        print()
 
     # merge rock into chamber
 
