@@ -26,10 +26,11 @@ class Chamber:
             row_number = len(self.rows) - 1 - i
             row_string = f"{row:07b}".replace('0', '·').replace('1', '#')
             if rock and row_number in rock.rows:
-                row_string = rock.draw_on(row_string)
+                # TODO: render rocks that span multiple rows (do this check differently? store value in rock.rows differently?)
+                row_string = rock.draw_on(row_string, 0)
 
             print(f'|{row_string}|  {row_number}')
-        print(f'+{"-" * CHAMBER_WIDTH}+')
+        print(f'+{"=" * CHAMBER_WIDTH}+')
 
     def get_row(self, height):
         return self.rows[height]
@@ -39,28 +40,40 @@ class Rock:
     """
     A rock's position (column, height) is the location of the bottom left corner of the rock
     Note that in the case of the + shaped rock, this position corresponds to a spot not occupied by rock
+
+    Shape contains a list of values, from bottom to up
+    e.g.
+        010           1 << 1 = 2
+        111           7
+        000           2
+
+    To materialize the rock's shape into a row, we need to bit shift the shape by its width and column position
+
     """
 
-    def __init__(self, height, column, shape):
+    def __init__(self, height, column, shape, length):
         self.shape = shape
         self.height = height
         self.column = column
-        self.rows = [height]
+        self.rows = [self.height + x for x in range(len(shape))]
+        self.length = length
         self.falling = True
 
     def __repr__(self):
-        return self.shape
+        return f"rock at {self.height} {self.column}"
 
-    def generate_bitmask(self):
+    def generate_bitmask(self, index=0):
+
         # this is going to be different depending on the shape, and which row we're calculating for
-        return int("1111", 2) << CHAMBER_WIDTH - 4 - self.column
+        return self.shape[index] << CHAMBER_WIDTH - 4 - self.column
 
-    def draw_on(self, string):
+    def draw_on(self, string, index=0):
         """Replaces characters in the string if the rock occupies those spaces"""
         # for i, (r, c) in enumerate(zip(self.generate_string(), string)):
         chars = []
-        for i, char in enumerate(string):
-            if i == self.column:
+        bitmask_string = binary(self.generate_bitmask(index))
+        for char, bit_char in zip(string, bitmask_string):
+            if bit_char == "1":
                 chars.append(ROCK_CHAR)
             else:
                 chars.append(char)
@@ -88,9 +101,9 @@ def generate_rock(chamber):
 
         # stick = [int("1111", 2) << (CHAMBER_WIDTH - 4 - 2)]
         rows = []
-        shape = "stick"
+        shape = [int("1111", 2)]
 
-        rock = Rock(height=height, column=2, shape=shape)
+        rock = Rock(height=height, column=2, shape=shape, length=4)
 
         yield (rock)
 
