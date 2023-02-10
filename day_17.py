@@ -2,6 +2,11 @@ ROCK_CHAR = "@"
 CHAMBER_WIDTH = 7
 
 
+def load_data(file):
+    with open(f'input/{file}.txt') as f:
+        return f.read()
+
+
 def binary(n):
     return f'{n:07b}'
 
@@ -10,6 +15,9 @@ class Chamber:
     """
 
     self.rows[0] is the bottom of the chamber
+
+    Highest rock position is the number that can still be filled
+    e.g. if there is a rock at height 2, highest rock position is now 3
 
     Row contents are stored as binary numbers
     e.g. 0001110 means there is a rock in columns 3, 4 and 5
@@ -21,13 +29,23 @@ class Chamber:
         self.rows = [0 for _ in range(4)]
         self.highest_rock = 0
 
+    def __getitem__(self, row_index):
+        rows_to_add = row_index - len(self.rows) + 1
+        if rows_to_add > 0:
+            self.rows.extend([0] * rows_to_add)
+            return 0
+        else:
+            return self.rows[row_index]
+
+    def __setitem__(self, row_index, value):
+        self.rows[row_index] = value
+
     def visualize(self, rock=None):
         for i, row in enumerate(reversed(self.rows)):
             row_number = len(self.rows) - 1 - i
             row_string = f"{row:07b}".replace('0', '·').replace('1', '#')
             if rock and row_number in rock.rows.keys():
                 index = rock.rows.get(row_number)
-                # TODO: render rocks that span multiple rows (do this check differently? store value in rock.rows differently?)
                 row_string = rock.draw_on(row_string, index)
 
             print(f'|{row_string}|  {row_number}')
@@ -38,15 +56,10 @@ class Chamber:
 
     def absorb_rock(self, rock):
         for chamber_row_number, index in rock.rows.items():
-            existing_chamber_row = self.rows[chamber_row_number]
-            self.rows[chamber_row_number] = existing_chamber_row | rock.generate_bitmask(index)
+            existing_chamber_row = self[chamber_row_number]
+            self[chamber_row_number] = existing_chamber_row | rock.generate_bitmask(index)
 
-        # update the highest point of rock
-        self.highest_rock = max(self.highest_rock, max(rock.rows.keys()))
-
-        # add more rows above the high point if necessary
-        if (rows_needed := self.highest_rock + 4 - len(self.rows)) > 0:
-            self.rows.extend([0] * rows_needed)
+        self.highest_rock = max(self.highest_rock, max(rock.rows.keys()) + 1)
 
 
 class Rock:
@@ -75,17 +88,15 @@ class Rock:
     def __repr__(self):
         return f"rock at {self.height} {self.column}"
 
-    def generate_bitmask(self, index=0):
-
-        # this is going to be different depending on the shape, and which row we're calculating for
-        return self.shape[index] << CHAMBER_WIDTH - self.max_width - self.column
+    def generate_bitmask(self, index=0, right_shift=0, left_shift=0):
+        return self.shape[index] << CHAMBER_WIDTH - self.max_width - self.column >> right_shift << left_shift
 
     def update_rows(self):
         self.rows = {(self.height + x): x for x in range(len(self.shape))}
 
     def draw_on(self, string, index=0):
         """Replaces characters in the string if the rock occupies those spaces"""
-        # for i, (r, c) in enumerate(zip(self.generate_string(), string)):
+
         chars = []
         bitmask_string = binary(self.generate_bitmask(index))
         for char, bit_char in zip(string, bitmask_string):
@@ -100,13 +111,44 @@ class Rock:
         self.update_rows()
 
     def can_drop(self, chamber):
-        # bitwise & to check potential collision
-        # print(binary(chamber.get_row(self.height - 1)))
-
-        # print(binary(self.generate_bitmask()))
-        will_collide_below = chamber.get_row(self.height - 1) & self.generate_bitmask()
+        will_collide_below = 0
+        for chamber_row, index in self.rows.items():
+            current_row_will_collide = chamber[max(chamber_row - 1, 0)] & self.generate_bitmask(index=index)
+            will_collide_below = will_collide_below | current_row_will_collide
         above_ground = self.height > 0
         return above_ground and not will_collide_below
+
+    def move_right(self):
+        self.column += 1
+
+    def move_left(self):
+        self.column -= 1
+
+    def can_move_right(self, chamber):
+        can_move = True
+        for row_number, index in self.rows.items():
+            right_edge_at_wall = 1 & self.generate_bitmask(index)
+            chamber_collision = chamber[row_number] & self.generate_bitmask(index, right_shift=1)
+            can_move = can_move and not right_edge_at_wall and not chamber_collision
+        return can_move
+
+    def can_move_left(self, chamber):
+        can_move = True
+        for row_number, index in self.rows.items():
+            left_edge_at_wall = (1 << (CHAMBER_WIDTH - 1)) & self.generate_bitmask(index)
+            chamber_collision = chamber[row_number] & self.generate_bitmask(index, left_shift=1)
+            can_move = can_move and not left_edge_at_wall and not chamber_collision
+        return can_move
+
+    def push_by_wind(self, direction, chamber):
+        match direction:
+            case ">":
+                if self.can_move_right(chamber):
+                    self.move_right()
+
+            case "<":
+                if self.can_move_left(chamber):
+                    self.move_left()
 
 
 class HorizontalStick(Rock):
@@ -153,7 +195,7 @@ def rock_cycle():
         yield Box()
 
 
-def rock_factory(rock_cycler, start_height, start_column=2):
+def rock_factory(rock_cycler, start_height, start_column=2) -> Rock:
     rock = next(rock_cycler)
     rock.height = start_height
     rock.column = start_column
@@ -162,35 +204,34 @@ def rock_factory(rock_cycler, start_height, start_column=2):
     return rock
 
 
+def wind_cycle(input):
+    while True:
+        for direction in input:
+            yield direction
+
+
 if __name__ == '__main__':
+    input = load_data('day_17_example')
+    wind_generator = wind_cycle(input)
+
     chamber = Chamber()
-    # chamber.rows[0] = int("0100001", 2)
     rock_cycler = rock_cycle()
 
-    for round in range(8):
-        rock = rock_factory(rock_cycler, chamber.highest_rock + 3)
-        while rock.falling:
-            rock.drop()
-            if not rock.can_drop(chamber):
-                rock.falling = False
+    import time
 
-            # simulate rock pushed by wind
+    start = time.time()
 
-            # # check the next iteration before looping around
-            # if not rock.can_drop(chamber):
-            #     rock.falling = False
-        chamber.absorb_rock(rock)
-        # chamber.visualize(None)
+    for round in range(1, 1 + 1000000):
+        rock = rock_factory(rock_cycler, chamber.highest_rock + 4)
+        while True:
+            if rock.can_drop(chamber):
+                rock.drop()
+            else:
+                chamber.absorb_rock(rock)
+                break
 
-        chamber.visualize(rock)
-        print()
+            rock.push_by_wind(next(wind_generator), chamber)
 
-    # merge rock into chamber
-
-    # current_rock.drop()
-    # print(current_rock)
-    # print(f'|{current_rock[0]:07b}|')
-    # spawn a rock, it will be spawned in open space
-    # compute drop and wind
-    # check if the rock has landed
-    # add the rock to the chamber
+    print(f'Part 1 highest rock: {chamber.highest_rock}')
+    current = time.time()
+    print(f"took {current - start} seconds")
