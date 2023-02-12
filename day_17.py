@@ -40,8 +40,10 @@ class Chamber:
     def __setitem__(self, row_index, value):
         self.rows[row_index] = value
 
-    def visualize(self, rock=None):
+    def visualize(self, rock=None, limit = 30):
         for i, row in enumerate(reversed(self.rows)):
+            if limit and i>limit:
+                break
             row_number = len(self.rows) - 1 - i
             row_string = f"{row:07b}".replace('0', '·').replace('1', '#')
             if rock and row_number in rock.rows.keys():
@@ -60,6 +62,10 @@ class Chamber:
             self[chamber_row_number] = existing_chamber_row | rock.generate_bitmask(index)
 
         self.highest_rock = max(self.highest_rock, max(rock.rows.keys()) + 1)
+
+    def top_n_rows(self, n):
+        """Returns n rows starting from the highest rock"""
+        return tuple(self.rows[self.highest_rock:self.highest_rock-n:-1])
 
 
 class Rock:
@@ -84,6 +90,7 @@ class Rock:
         self.max_width = None
         self.shape = None
         self.rows = None
+        self.type = None
 
     def __repr__(self):
         return f"rock at {self.height} {self.column}"
@@ -156,6 +163,7 @@ class HorizontalStick(Rock):
         super().__init__(*args, **kwargs)
         self.shape = [int("1111", 2)]
         self.max_width = 4
+        self.type = "horizontal_stick"
 
 
 class Plus(Rock):
@@ -163,6 +171,7 @@ class Plus(Rock):
         super().__init__(*args, **kwargs)
         self.shape = [int("10", 2), int("111", 2), int("10", 2)]
         self.max_width = 3
+        self.type = "plus"
 
 
 class ReverseL(Rock):
@@ -170,6 +179,7 @@ class ReverseL(Rock):
         super().__init__(*args, **kwargs)
         self.shape = [int("111", 2), int("1", 2), int("1", 2)]
         self.max_width = 3
+        self.type = "reverse_l"
 
 
 class VerticalStick(Rock):
@@ -177,6 +187,7 @@ class VerticalStick(Rock):
         super().__init__(*args, **kwargs)
         self.shape = [int("1", 2)] * 4
         self.max_width = 1
+        self.type = "vertical_stick"
 
 
 class Box(Rock):
@@ -184,6 +195,7 @@ class Box(Rock):
         super().__init__(*args, **kwargs)
         self.shape = [int("11", 2)] * 2
         self.max_width = 2
+        self.type = "box"
 
 
 def rock_cycle():
@@ -221,7 +233,7 @@ if __name__ == '__main__':
 
     start = time.time()
 
-    for round in range(1, 1 + 1000000):
+    for round in range(1, 1 + 100):
         rock = rock_factory(rock_cycler, chamber.highest_rock + 4)
         while True:
             if rock.can_drop(chamber):
@@ -231,7 +243,73 @@ if __name__ == '__main__':
                 break
 
             rock.push_by_wind(next(wind_generator), chamber)
-
+    chamber.visualize()
+    print(chamber.top_n_rows(20))
     print(f'Part 1 highest rock: {chamber.highest_rock}')
     current = time.time()
     print(f"took {current - start} seconds")
+
+    # Part 2: Let's see if we can find a cycle
+
+
+    wind_generator = wind_cycle(input)
+    chamber = Chamber()
+    seen_states = {}
+    target_rounds = 1000000000000
+    running_total = 0
+    save_states = True
+    remaining_rounds = None
+
+    for round in range(1, 5000):
+        rock = rock_factory(rock_cycler, chamber.highest_rock + 4)
+        chamber_state = chamber.top_n_rows(20)
+        wind_direction = next(wind_generator)
+        state = (rock.type, chamber_state, wind_direction)
+
+        if save_states and state in seen_states:
+            previous_round, previous_height = seen_states[state]
+            current_round = round
+            current_height = chamber.highest_rock
+            print(f"state: {state} previously seen at round {previous_round} at height {previous_height}")
+            print(f"current round: {current_round}")
+            number_of_cycles = target_rounds//(current_round - previous_round)
+            remaining_rounds = target_rounds % (current_round - previous_round)
+            height_per_cycle = current_height - previous_height
+            print(number_of_cycles)
+            print(height_per_cycle)
+            print(f"result is {previous_height} + {number_of_cycles}*{height_per_cycle} + simulate {remaining_rounds}")
+
+            running_total += (previous_height + number_of_cycles*height_per_cycle)
+            print(1514285714288 - running_total)
+            print(running_total)
+            save_states = False
+
+        elif save_states:
+            seen_states[state] = round, chamber.highest_rock
+
+        while True:
+
+            if rock.can_drop(chamber):
+                rock.drop()
+            else:
+                chamber.absorb_rock(rock)
+                break
+
+            if not wind_direction:
+                wind_direction = next(wind_generator)
+            rock.push_by_wind(wind_direction, chamber)
+            wind_direction = None
+
+        if remaining_rounds and remaining_rounds > 0:
+            running_total += chamber.highest_rock
+            print(f'remaining: {remaining_rounds}, total: {running_total}')
+            remaining_rounds -= 1
+        elif remaining_rounds and remaining_rounds==0:
+            running_total += chamber.highest_rock
+            print(f'remaining: {remaining_rounds}, total: {running_total}')
+            remaining_rounds -= 1
+            break
+    print("end")
+
+
+    print(f"after 1 trillion rounds, the height is {running_total}")
