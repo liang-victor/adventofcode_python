@@ -9,6 +9,27 @@ There is a progression from clay -> obsidian -> geode
 import re
 
 
+class MiningState:
+    def __init__(self, ore_robots=1, clay_robots=0, obsidian_robots=0, geode_robots=0):
+        self.ore_robots = ore_robots
+        self.clay_robots = clay_robots
+        self.obsidian_robots = obsidian_robots
+        self.geode_robots = geode_robots
+        self.ore = 0
+        self.clay = 0
+        self.obsidian = 0
+        self.geode = 0
+
+    def __repr__(self):
+        return f"State: ore: {self.ore}, clay: {self.clay}, obsidian: {self.obsidian}, geode: {self.geode}"
+
+    def update_mining(self):
+        self.ore += self.ore_robots
+        self.clay += self.clay_robots
+        self.obsidian += self.obsidian_robots
+        self.geode += self.obsidian_robots
+
+
 class Blueprint:
     def __init__(self, id, ore_robot_cost, clay_robot_cost, obsidian_ore_cost,
                  obsidian_clay_cost, geode_ore_cost, geode_obsidian_cost):
@@ -26,6 +47,25 @@ class Blueprint:
     def simulate(self, max_time):
         state = MiningState()
         time = 0
+
+        """
+        from a given state, we have have a few options:
+            - accumulate the ore to buy another ore robot
+            - accumulate the ore to buy another clay robot
+            if I have at least one clay robot:
+                - accumulate the ore and clay to buy an obsidian robot
+            if I have at least one obsidian robot:
+                - accumulate the ore and obsidian to buy a geode robot
+            - I can also accumulate resources to the time limit    
+            
+            ^ for each above option there is time cost to accumulate the resource necessary
+            (should that be part of the state? or packaged alongside the state?)
+            compute the resulting state and time for each choice
+             - put those states in the stack and simulate from those states 
+             - alternatively call simulate recursively on those states and keep the one with the highest geode count at the time limit
+            
+            
+        """
 
         while time <= max_time:
             print(f'Time: {time}')
@@ -50,26 +90,8 @@ class Blueprint:
             time += 1
             print()
 
-
-class MiningState:
-    def __init__(self, ore_robots=1, clay_robots=0, obsidian_robots=0, geode_robots=0):
-        self.ore_robots = ore_robots
-        self.clay_robots = clay_robots
-        self.obsidian_robots = obsidian_robots
-        self.geode_robots = geode_robots
-        self.ore = 0
-        self.clay = 0
-        self.obsidian = 0
-        self.geode = 0
-
-    def __repr__(self):
-        return f"State: ore: {self.ore}, clay: {self.clay}, obsidian: {self.obsidian}, geode: {self.geode}"
-
-    def update_mining(self):
-        self.ore += self.ore_robots
-        self.clay += self.clay_robots
-        self.obsidian += self.obsidian_robots
-        self.geode += self.obsidian_robots
+    def dfs(self, state: MiningState):
+        pass
 
 
 def load_data(file):
