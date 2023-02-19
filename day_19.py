@@ -9,16 +9,36 @@ There is a progression from clay -> obsidian -> geode
 import re
 
 
+MAX_TIME = 25
+
 class MiningState:
-    def __init__(self, ore_robots=1, clay_robots=0, obsidian_robots=0, geode_robots=0):
-        self.ore_robots = ore_robots
-        self.clay_robots = clay_robots
-        self.obsidian_robots = obsidian_robots
-        self.geode_robots = geode_robots
-        self.ore = 0
-        self.clay = 0
-        self.obsidian = 0
-        self.geode = 0
+    def __init__(self,
+                 ore_robots=1,
+                 clay_robots=0,
+                 obsidian_robots=0,
+                 geode_robots=0,
+                 ore=0,
+                 clay=0,
+                 obsidian=0,
+                 geode=0,
+                 time=0):
+        self.robots = {"ore": ore_robots,
+                       "clay": clay_robots,
+                       "obsidian": obsidian_robots,
+                       "geode": geode_robots}
+        self.resources= {"ore": ore,
+                       "clay": clay,
+                       "obsidian": obsidian,
+                       "geode": geode}
+        # self.ore_robots = ore_robots
+        # self.clay_robots = clay_robots
+        # self.obsidian_robots = obsidian_robots
+        # self.geode_robots = geode_robots
+        # self.ore = ore
+        # self.clay = clay
+        # self.obsidian = obsidian
+        # self.geode = geode
+        self.time = time
 
     def __repr__(self):
         return f"State: ore: {self.ore}, clay: {self.clay}, obsidian: {self.obsidian}, geode: {self.geode}"
@@ -29,21 +49,48 @@ class MiningState:
         self.obsidian += self.obsidian_robots
         self.geode += self.obsidian_robots
 
+    def is_generating(self, resource):
+        # todo: use case here? enum too?
+        if resource == "ore":
+            return self.ore_robots > 0
+        if resource == "clay":
+            return self.clay_robots > 0
+        if resource == "obsidian":
+            return self.obsidian_robots > 0
+        if resource == "geode":
+            return self.geode_robots > 0
+        raise f"Unknown resource {resource}"
 
+    def time_to_buy_next_robot(self, robot_type, blueprint):
+        if robot_type == "ore":
+            resource_required = blueprint.ore_robot_cost - self.ore
+            if resource_required % self.ore_robots ==0:
+                return resource_required // self.ore_robots
+            else:
+                return resource_required // self.ore_robots + 1
+
+        elif robot_type == "clay":
+            resource_required =  blueprint.clay_robot_cost - self.clay
+            if resource_required % self.ore_robots == 0:
+                return resource_required // self.ore_robots
+            else:
+                return resource_required // self.ore_robots + 1
 class Blueprint:
     def __init__(self, id, ore_robot_cost, clay_robot_cost, obsidian_ore_cost,
                  obsidian_clay_cost, geode_ore_cost, geode_obsidian_cost):
         self.id = id
-        self.ore_robot_cost = ore_robot_cost
-        self.clay_robot_cost = clay_robot_cost
-        self.obsidian_ore_cost = obsidian_ore_cost
-        self.obsidian_clay_cost = obsidian_clay_cost
-        self.geode_ore_cost = geode_ore_cost
-        self.geode_obsidian_cost = geode_obsidian_cost
+        self.ore_robot_cost = self.cost_map(ore=ore_robot_cost)
+        self.clay_robot_cost = self.cost_map(ore=clay_robot_cost)
+        self.obsidian_robot_cost = self.cost_map(ore=obsidian_ore_cost,
+                                               clay=obsidian_clay_cost)
+        self.geode_robot_cost = self.cost_map(ore=geode_ore_cost,
+                                            obsidian=geode_obsidian_cost)
+    @staticmethod
+    def cost_map(self, ore=0, clay=0, obsidian=0):
+        return {"ore": ore, "clay": clay, "obsidian": obsidian}
 
     def __repr__(self):
         return f'Blueprint {self.id}'
-
     def simulate(self, max_time):
         state = MiningState()
         time = 0
@@ -90,8 +137,8 @@ class Blueprint:
             time += 1
             print()
 
-    def dfs(self, state: MiningState):
-        pass
+    def dfs_max_geodes(self, state: MiningState):
+        if state.is_generating("ore") and time_cost :=
 
 
 def load_data(file):
