@@ -7,7 +7,7 @@ There is a progression from clay -> obsidian -> geode
 
 """
 import re
-
+from copy import deepcopy
 
 MAX_TIME = 25
 
@@ -43,38 +43,57 @@ class MiningState:
     def __repr__(self):
         return f"State: ore: {self.ore}, clay: {self.clay}, obsidian: {self.obsidian}, geode: {self.geode}"
 
-    def update_mining(self):
-        self.ore += self.ore_robots
-        self.clay += self.clay_robots
-        self.obsidian += self.obsidian_robots
-        self.geode += self.obsidian_robots
+    def simulate_turns(self, turns):
+        updated_state = deepcopy(self)
+        """Returns a new state with incremented values"""
+        for _turn in range(turns):
+            for resource in ['ore', 'clay', 'obsidian', 'geode']:
+                updated_state.resources[resource] += updated_state.robots[resource]
+            updated_state.time += 1
+
+        return updated_state
+
 
     def is_generating(self, resource):
-        # todo: use case here? enum too?
-        if resource == "ore":
-            return self.ore_robots > 0
-        if resource == "clay":
-            return self.clay_robots > 0
-        if resource == "obsidian":
-            return self.obsidian_robots > 0
-        if resource == "geode":
-            return self.geode_robots > 0
-        raise f"Unknown resource {resource}"
+        return self.robots.get(resource) > 0
 
     def time_to_buy_next_robot(self, robot_type, blueprint):
-        if robot_type == "ore":
-            resource_required = blueprint.ore_robot_cost - self.ore
-            if resource_required % self.ore_robots ==0:
-                return resource_required // self.ore_robots
-            else:
-                return resource_required // self.ore_robots + 1
+        # for each robot type, fetch the cost map
+        # check the number of turns needed to reach that value
+        # the maximum number determines number of turns needed
+        # using that maximum number, determine amount of all resources generated
 
-        elif robot_type == "clay":
-            resource_required =  blueprint.clay_robot_cost - self.clay
-            if resource_required % self.ore_robots == 0:
-                return resource_required // self.ore_robots
+        cost_map = blueprint.get_costs(robot_type)
+        turns = self.turns_to_build(cost_map)
+
+
+
+
+
+        # if resource == "ore":
+        #     resource_required = blueprint.ore_robot_cost[resource] - self.resources
+        #     if resource_required % self.ore_robots ==0:
+        #         return resource_required // self.ore_robots
+        #     else:
+        #         return resource_required // self.ore_robots + 1
+        #
+        # elif robot_type == "clay":
+        #     resource_required =  blueprint.clay_robot_cost - self.clay
+        #     if resource_required % self.ore_robots == 0:
+        #         return resource_required // self.ore_robots
+        #     else:
+        #         return resource_required // self.ore_robots + 1
+
+    def turns_to_build(self, cost_map):
+        """Returns the number of turns needed to build the robot, based on the bottlenecking resource"""
+        turns = 0
+        for resource, cost in cost_map.items():
+            required = cost - self.resources[resource]
+            if required % self.robots[resource] == 0:
+                turns = max(turns, required // self.robots[resource])
             else:
-                return resource_required // self.ore_robots + 1
+                turns = max(turns, required // self.robots[resource] + 1)
+
 class Blueprint:
     def __init__(self, id, ore_robot_cost, clay_robot_cost, obsidian_ore_cost,
                  obsidian_clay_cost, geode_ore_cost, geode_obsidian_cost):
@@ -88,6 +107,15 @@ class Blueprint:
     @staticmethod
     def cost_map(self, ore=0, clay=0, obsidian=0):
         return {"ore": ore, "clay": clay, "obsidian": obsidian}
+
+    def get_costs(self, robot_type):
+        match robot_type:
+            case "ore": return self.ore_robot_cost
+            case "clay": return self.clay_robot_cost
+            case "obsidian": return self.obsidian_robot_cost
+            case "geode": return self.geode_robot_cost
+            case _: raise "Unknown robot type, no cost map available"
+
 
     def __repr__(self):
         return f'Blueprint {self.id}'
