@@ -11,6 +11,7 @@ from copy import deepcopy
 
 MAX_TIME = 25
 
+
 class MiningState:
     def __init__(self,
                  ore_robots=1,
@@ -26,22 +27,14 @@ class MiningState:
                        "clay": clay_robots,
                        "obsidian": obsidian_robots,
                        "geode": geode_robots}
-        self.resources= {"ore": ore,
-                       "clay": clay,
-                       "obsidian": obsidian,
-                       "geode": geode}
-        # self.ore_robots = ore_robots
-        # self.clay_robots = clay_robots
-        # self.obsidian_robots = obsidian_robots
-        # self.geode_robots = geode_robots
-        # self.ore = ore
-        # self.clay = clay
-        # self.obsidian = obsidian
-        # self.geode = geode
+        self.resources = {"ore": ore,
+                          "clay": clay,
+                          "obsidian": obsidian,
+                          "geode": geode}
         self.time = time
 
     def __repr__(self):
-        return f"State: ore: {self.ore}, clay: {self.clay}, obsidian: {self.obsidian}, geode: {self.geode}"
+        return f"time: {self.time}, robots: {self.robots}, resources: {self.resources}"
 
     def simulate_turns(self, turns):
         updated_state = deepcopy(self)
@@ -53,36 +46,14 @@ class MiningState:
 
         return updated_state
 
+    def buy_robot(self, robot_type, blueprint):
+        for resource, cost in blueprint.get_costs(robot_type).items():
+            self.resources[resource] -= cost
+        self.robots[robot_type] += 1
+        return self
 
     def is_generating(self, resource):
         return self.robots.get(resource) > 0
-
-    def time_to_buy_next_robot(self, robot_type, blueprint):
-        # for each robot type, fetch the cost map
-        # check the number of turns needed to reach that value
-        # the maximum number determines number of turns needed
-        # using that maximum number, determine amount of all resources generated
-
-        cost_map = blueprint.get_costs(robot_type)
-        turns = self.turns_to_build(cost_map)
-
-
-
-
-
-        # if resource == "ore":
-        #     resource_required = blueprint.ore_robot_cost[resource] - self.resources
-        #     if resource_required % self.ore_robots ==0:
-        #         return resource_required // self.ore_robots
-        #     else:
-        #         return resource_required // self.ore_robots + 1
-        #
-        # elif robot_type == "clay":
-        #     resource_required =  blueprint.clay_robot_cost - self.clay
-        #     if resource_required % self.ore_robots == 0:
-        #         return resource_required // self.ore_robots
-        #     else:
-        #         return resource_required // self.ore_robots + 1
 
     def turns_to_build(self, cost_map):
         """Returns the number of turns needed to build the robot, based on the bottlenecking resource"""
@@ -93,6 +64,30 @@ class MiningState:
                 turns = max(turns, required // self.robots[resource])
             else:
                 turns = max(turns, required // self.robots[resource] + 1)
+        return turns
+
+    def geodes_wait_to_end(self):
+        remaining_turns = MAX_TIME - self.time
+        geodes = self.resources["geode"] + remaining_turns * self.robots["geode"]
+        return geodes
+
+    def dfs_max_geodes(self, blueprint):
+        max_geodes = 0
+        # explore the option of building each of the robot types...
+        for resource in ['ore', 'clay', 'obsidian', 'geode']:
+            turns = self.turns_to_build(blueprint.get_costs(resource))
+
+            if turns + self.time < MAX_TIME:
+                next_state = \
+                    self.simulate_turns(turns) \
+                        .buy_robot(resource, blueprint)
+                print(f"it will take {turns} turns to build {resource} robot")
+                max_geodes = max(max_geodes, next_state.dfs_max_geodes(blueprint))
+
+        # ... or do nothing and wait things out
+        max_geodes = max(max_geodes, self.geodes_wait_to_end())
+        return max_geodes
+
 
 class Blueprint:
     def __init__(self, id, ore_robot_cost, clay_robot_cost, obsidian_ore_cost,
@@ -101,24 +96,30 @@ class Blueprint:
         self.ore_robot_cost = self.cost_map(ore=ore_robot_cost)
         self.clay_robot_cost = self.cost_map(ore=clay_robot_cost)
         self.obsidian_robot_cost = self.cost_map(ore=obsidian_ore_cost,
-                                               clay=obsidian_clay_cost)
+                                                 clay=obsidian_clay_cost)
         self.geode_robot_cost = self.cost_map(ore=geode_ore_cost,
-                                            obsidian=geode_obsidian_cost)
+                                              obsidian=geode_obsidian_cost)
+
     @staticmethod
-    def cost_map(self, ore=0, clay=0, obsidian=0):
+    def cost_map(ore=0, clay=0, obsidian=0):
         return {"ore": ore, "clay": clay, "obsidian": obsidian}
 
     def get_costs(self, robot_type):
         match robot_type:
-            case "ore": return self.ore_robot_cost
-            case "clay": return self.clay_robot_cost
-            case "obsidian": return self.obsidian_robot_cost
-            case "geode": return self.geode_robot_cost
-            case _: raise "Unknown robot type, no cost map available"
-
+            case "ore":
+                return self.ore_robot_cost
+            case "clay":
+                return self.clay_robot_cost
+            case "obsidian":
+                return self.obsidian_robot_cost
+            case "geode":
+                return self.geode_robot_cost
+            case _:
+                raise "Unknown robot type, no cost map available"
 
     def __repr__(self):
         return f'Blueprint {self.id}'
+
     def simulate(self, max_time):
         state = MiningState()
         time = 0
@@ -164,9 +165,9 @@ class Blueprint:
             print(state)
             time += 1
             print()
-
-    def dfs_max_geodes(self, state: MiningState):
-        if state.is_generating("ore") and time_cost :=
+    #
+    # def dfs_max_geodes(self, state: MiningState):
+    #     if state.is_generating("ore") and time_cost :=
 
 
 def load_data(file):
@@ -187,4 +188,5 @@ if __name__ == "__main__":
     data = load_data("day_19_example")
     blueprints = process_data(data)
     print(blueprints)
-    blueprints[0].simulate(24)
+    max_geodes = MiningState().dfs_max_geodes(blueprints[0])
+    print(max_geodes)
