@@ -9,7 +9,7 @@ There is a progression from clay -> obsidian -> geode
 import re
 from copy import deepcopy
 
-MAX_TIME = 25
+MAX_TIME = 24
 
 
 class MiningState:
@@ -22,7 +22,7 @@ class MiningState:
                  clay=0,
                  obsidian=0,
                  geode=0,
-                 time=0):
+                 time=1):
         self.robots = {"ore": ore_robots,
                        "clay": clay_robots,
                        "obsidian": obsidian_robots,
@@ -60,10 +60,12 @@ class MiningState:
         turns = 0
         for resource, cost in cost_map.items():
             required = cost - self.resources[resource]
-            if required % self.robots[resource] == 0:
-                turns = max(turns, required // self.robots[resource])
-            else:
+            if self.resources[resource] >= cost:
+                continue
+            elif required % self.robots[resource] == 0:
                 turns = max(turns, required // self.robots[resource] + 1)
+            else:
+                turns = max(turns, required // self.robots[resource] + 2)
         return turns
 
     def geodes_wait_to_end(self):
@@ -74,19 +76,28 @@ class MiningState:
     def dfs_max_geodes(self, blueprint):
         max_geodes = 0
         # explore the option of building each of the robot types...
-        for resource in ['ore', 'clay', 'obsidian', 'geode']:
+        for resource in ['geode', 'obsidian', 'clay', 'ore']:
+            if not self.possible_to_build(resource, blueprint):
+                # print(f"cannot build {resource} robot, skipping...")
+                continue
+
             turns = self.turns_to_build(blueprint.get_costs(resource))
 
             if turns + self.time < MAX_TIME:
                 next_state = \
                     self.simulate_turns(turns) \
                         .buy_robot(resource, blueprint)
-                print(f"it will take {turns} turns to build {resource} robot")
+                # print(f"it will take {turns} turns to build {resource} robot")
                 max_geodes = max(max_geodes, next_state.dfs_max_geodes(blueprint))
 
         # ... or do nothing and wait things out
         max_geodes = max(max_geodes, self.geodes_wait_to_end())
         return max_geodes
+
+    def possible_to_build(self, resource, blueprint):
+        """Is possible to build if robots exists that generate the resource needed"""
+        cost_map = blueprint.get_costs(resource)
+        return all([self.robots[resource_type] > 0 for resource_type, cost in cost_map.items() if cost > 0])
 
 
 class Blueprint:
@@ -119,55 +130,6 @@ class Blueprint:
 
     def __repr__(self):
         return f'Blueprint {self.id}'
-
-    def simulate(self, max_time):
-        state = MiningState()
-        time = 0
-
-        """
-        from a given state, we have have a few options:
-            - accumulate the ore to buy another ore robot
-            - accumulate the ore to buy another clay robot
-            if I have at least one clay robot:
-                - accumulate the ore and clay to buy an obsidian robot
-            if I have at least one obsidian robot:
-                - accumulate the ore and obsidian to buy a geode robot
-            - I can also accumulate resources to the time limit    
-            
-            ^ for each above option there is time cost to accumulate the resource necessary
-            (should that be part of the state? or packaged alongside the state?)
-            compute the resulting state and time for each choice
-             - put those states in the stack and simulate from those states 
-             - alternatively call simulate recursively on those states and keep the one with the highest geode count at the time limit
-            
-            
-        """
-
-        while time <= max_time:
-            print(f'Time: {time}')
-            if state.ore >= self.geode_ore_cost and state.obsidian >= self.geode_obsidian_cost:
-                print("buy a geode robot!")
-                state.ore -= self.geode_ore_cost
-                state.obsidian -= self.geode_obsidian_cost
-                state.geode_robots += 1
-
-            if state.ore >= self.obsidian_ore_cost and state.clay >= self.obsidian_clay_cost:
-                print("buy an obsidian robot!")
-                state.ore -= self.obsidian_ore_cost
-                state.clay -= self.obsidian_clay_cost
-                state.clay_robots += 1
-
-            if state.ore >= self.clay_robot_cost:
-                print("buy a clay robot!")
-                state.ore -= self.clay_robot_cost
-                state.clay_robots += 1
-            state.update_mining()
-            print(state)
-            time += 1
-            print()
-    #
-    # def dfs_max_geodes(self, state: MiningState):
-    #     if state.is_generating("ore") and time_cost :=
 
 
 def load_data(file):
