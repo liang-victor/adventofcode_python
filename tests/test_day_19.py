@@ -23,10 +23,22 @@ def test_expect_to_wait_out_time():
     assert max_geodes == expected
 
 
-def test_expect_to_buy_geode_robot_at_20_turns():
+def test_expect_to_buy_one_geode_robot_at_20_turns():
     blueprint = default_blueprint()
-    blueprint.geode_robot_cost = Blueprint.cost_map(20, 0, 20)
+    blueprint.geode_robot_cost = Blueprint.cost_map(19, 0, 19)
     state = MiningState(1, 1, 1, 0, 0, 0, 0, 0, 0)
+
+    max_geodes = state.dfs_max_geodes(blueprint)
+    expected = 5
+
+    assert max_geodes == expected
+
+
+def test_expect_to_eventually_buy_one_geode_robot_at_20_turns():
+    blueprint = default_blueprint()
+    blueprint.obsidian_robot_cost = Blueprint.cost_map(10, 10)
+    blueprint.geode_robot_cost = Blueprint.cost_map(10, 0, 10)
+    state = MiningState(1, 1, 0, 0, 0, 0, 0, 0, 0)
 
     max_geodes = state.dfs_max_geodes(blueprint)
     expected = 5

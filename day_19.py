@@ -22,7 +22,8 @@ class MiningState:
                  clay=0,
                  obsidian=0,
                  geode=0,
-                 time=1):
+                 time=1,
+                 move="start"):
         self.robots = {"ore": ore_robots,
                        "clay": clay_robots,
                        "obsidian": obsidian_robots,
@@ -32,9 +33,10 @@ class MiningState:
                           "obsidian": obsidian,
                           "geode": geode}
         self.time = time
+        self.moves = move
 
     def __repr__(self):
-        return f"time: {self.time}, robots: {self.robots}, resources: {self.resources}"
+        return f"{self.move}, time: {self.time}"
 
     def simulate_turns(self, turns):
         updated_state = deepcopy(self)
@@ -57,7 +59,7 @@ class MiningState:
 
     def turns_to_build(self, cost_map):
         """Returns the number of turns needed to build the robot, based on the bottlenecking resource"""
-        turns = 0
+        turns = 1
         for resource, cost in cost_map.items():
             required = cost - self.resources[resource]
             if self.resources[resource] >= cost:
@@ -69,26 +71,40 @@ class MiningState:
         return turns
 
     def geodes_wait_to_end(self):
-        remaining_turns = MAX_TIME - self.time
+        remaining_turns = MAX_TIME + 1 - self.time
         geodes = self.resources["geode"] + remaining_turns * self.robots["geode"]
         return geodes
 
-    def dfs_max_geodes(self, blueprint):
-        max_geodes = 0
+    def set_move(self, move):
+        self.move = move
+        return self
+
+    def dfs_max_geodes(self, blueprint, max_geodes=0):
         # explore the option of building each of the robot types...
         for resource in ['geode', 'obsidian', 'clay', 'ore']:
-            if not self.possible_to_build(resource, blueprint):
+            possible_to_build = self.possible_to_build(resource, blueprint)
+            too_many_robots_of_type = self.too_many_robots_of_type(resource, blueprint)
+
+            if not possible_to_build or \
+                    too_many_robots_of_type:
                 # print(f"cannot build {resource} robot, skipping...")
                 continue
 
             turns = self.turns_to_build(blueprint.get_costs(resource))
+            within_time_limit = turns + self.time < MAX_TIME
 
-            if turns + self.time < MAX_TIME:
+            if within_time_limit:
                 next_state = \
                     self.simulate_turns(turns) \
-                        .buy_robot(resource, blueprint)
+                        .buy_robot(resource, blueprint) \
+                        .set_move(f"build {resource} robot")
+
+                next_state_not_enough_geode_potential = next_state.upper_limit_max_possible_geodes() < max_geodes
+
+                if next_state_not_enough_geode_potential:
+                    continue
                 # print(f"it will take {turns} turns to build {resource} robot")
-                max_geodes = max(max_geodes, next_state.dfs_max_geodes(blueprint))
+                max_geodes = max(max_geodes, next_state.dfs_max_geodes(blueprint, max_geodes))
 
         # ... or do nothing and wait things out
         max_geodes = max(max_geodes, self.geodes_wait_to_end())
@@ -98,6 +114,17 @@ class MiningState:
         """Is possible to build if robots exists that generate the resource needed"""
         cost_map = blueprint.get_costs(resource)
         return all([self.robots[resource_type] > 0 for resource_type, cost in cost_map.items() if cost > 0])
+
+    def too_many_robots_of_type(self, resource, blueprint):
+        """If we have enough robots of a certain resource to build one per turn, there's no reason to build more"""
+        return self.robots[resource] >= blueprint.max_cost[resource]
+
+    def upper_limit_max_possible_geodes(self):
+        """If we produce one geode robot, how many geodes will we have at the time limit?
+        Numbers fit triangular sequence
+        """
+        remaining_turns = MAX_TIME - self.time
+        return self.resources["geode"] + remaining_turns * (remaining_turns + 1) // 2
 
 
 class Blueprint:
@@ -110,10 +137,11 @@ class Blueprint:
                                                  clay=obsidian_clay_cost)
         self.geode_robot_cost = self.cost_map(ore=geode_ore_cost,
                                               obsidian=geode_obsidian_cost)
+        self.max_cost = self.calculate_max_cost()
 
     @staticmethod
-    def cost_map(ore=0, clay=0, obsidian=0):
-        return {"ore": ore, "clay": clay, "obsidian": obsidian}
+    def cost_map(ore=0, clay=0, obsidian=0, geode=0):
+        return {"ore": ore, "clay": clay, "obsidian": obsidian, "geode": geode}
 
     def get_costs(self, robot_type):
         match robot_type:
@@ -127,6 +155,22 @@ class Blueprint:
                 return self.geode_robot_cost
             case _:
                 raise "Unknown robot type, no cost map available"
+
+    def calculate_max_cost(self):
+        max_cost_map = self.cost_map()
+
+        for resource in max_cost_map.keys():
+            max_cost_map[resource] = max(
+                [self.ore_robot_cost[resource],
+                 self.clay_robot_cost[resource],
+                 self.obsidian_robot_cost[resource],
+                 self.geode_robot_cost[resource]]
+            )
+
+        # we want as many geode bots as possible
+        max_cost_map["geode"] = 9999
+
+        return max_cost_map
 
     def __repr__(self):
         return f'Blueprint {self.id}'
