@@ -85,6 +85,15 @@ class MiningState:
             possible_to_build = self.possible_to_build(resource, blueprint)
             too_many_robots_of_type = self.too_many_robots_of_type(resource, blueprint)
 
+            # when evaluating options that skip ahead to more expensive robots, there should be some banked basic resource
+            # if close to the end, you shouldn't have to care about producing more
+
+            # if I'm close to the end of time I shouldn't have to care about lesser robots
+            # because their resources won't come into play
+            # e.g. if it's the last turn, don't care about obsidian
+            # if it's the second last turn, don't care about clay
+            # if it's the third last turn, don't care about ore
+
             if not possible_to_build or \
                     too_many_robots_of_type:
                 # print(f"cannot build {resource} robot, skipping...")
