@@ -1,13 +1,18 @@
+from collections import deque
+
+DECRYPTION_KEY = 811589153
+
 
 def load_data(file):
     with open(f'input/{file}.txt') as f:
         data = f.read().split('\n')
         return [int(n) for n in data]
 
+
 # listnode class for doubly linked list
 
 class ListNode:
-    def __init__(self, value, position = None):
+    def __init__(self, value, position=None):
         self.value = value
         self.position = position
         self.next = None
@@ -15,6 +20,8 @@ class ListNode:
 
     def __repr__(self):
         return f"⇌ {self.value} "
+
+
 # construct circular doubly linked list from input
 def create_circular_doubly_linked_list(values):
     prev = None
@@ -34,6 +41,7 @@ def create_circular_doubly_linked_list(values):
     node.next = head
     return head
 
+
 def print_list(head, count):
     i = 0
     p = head
@@ -42,81 +50,108 @@ def print_list(head, count):
         p = p.next
         i += 1
 
+
 def list_of_nodes(head):
     """Returns a list of the nodes so we can iterate in original order"""
     i = 0
     result = []
     p = head
-    while i<= head.prev.position:
+    while i <= head.prev.position:
         result.append(p)
         p = p.next
-        i+=1
+        i += 1
     return result
 
-def mix_node(node):
+
+def mix_node(node, list_size):
     i = 0
     p = node
+    reduced_steps = abs(node.value) % (list_size - 1)
 
     # no change on 0
-    if node.value == 0:
+    if reduced_steps == 0:
         return
 
-    # travel to destination based on value
     if node.value > 0:
-        while i < node.value:
+        while i < reduced_steps:
             p = p.next
-            i+=1
+            i += 1
 
-    if node.value < 0:
-        while i > node.value:
+    elif node.value < 0:
+        while i > -1 * reduced_steps - 1:
             p = p.prev
             i -= 1
 
-
+    # travel to destination based on value
     original_prev = node.prev
     original_next = node.next
+
+    # directly connect current prev and next to cover hole
+    original_prev.next = original_next
+    original_next.prev = original_prev
 
     # splice node into destination
     target_after = p.next
     p.next = node
     node.prev = p
     node.next = target_after
-    target_after.prev = node.next
+    target_after.prev = node
 
-    # directly connect current prev and next to cover hole
-    original_prev.next = original_next
-    original_next.prev = original_prev
+
+def get_node_at_value(starting_node, value):
+    p = starting_node
+    while p.value != value:
+        p = p.next
+    return p
 
 
 if __name__ == '__main__':
-    input_data = load_data("day_20_example")
+    input_data = load_data("day_20")
+
     head = create_circular_doubly_linked_list(input_data)
 
-    max_position = head.prev.position
+    list_size = head.prev.position + 1
 
     original_list = list_of_nodes(head)
 
-    # original_list[3].value = 18
-    # print(original_list)
-    print_list(head, max_position)
-    print()
+    for i, node in enumerate(original_list):
+        mix_node(node, list_size)
 
-    mix_node(original_list[0])
-    print()
-    print_list(head, max_position)
+    zero_head = get_node_at_value(head, 0)
 
-    mix_node(original_list[1])
-    print()
-    print_list(head, max_position)
+    sub_result = []
+    p = zero_head
 
-    mix_node(original_list[2])
-    print()
-    print_list(head, max_position)
+    for i in range(3000):
+        p = p.next
+        if (i + 1) % 1000 == 0:
+            sub_result.append(p.value)
 
-    # for node in original_list:
-    #     mix_node(node)
-    #     print()
-    #     print_list(head, max_position)
+    result_p1 = sum(sub_result)
+    print(f"The sum of the grove coordinates is {result_p1}")
 
-    # print_list(head, max_position)
+    # part 2
 
+    head = create_circular_doubly_linked_list(map(lambda x: x * DECRYPTION_KEY, input_data))
+
+    list_size = head.prev.position + 1
+
+    original_list = list_of_nodes(head)
+
+    for _ in range(10):
+        for i, node in enumerate(original_list):
+            mix_node(node, list_size)
+
+    zero_head = get_node_at_value(head, 0)
+
+    sub_result = []
+    p = zero_head
+
+    for i in range(3000):
+        p = p.next
+        if (i + 1) % 1000 == 0:
+            sub_result.append(p.value)
+    print(sub_result)
+
+    result_p2 = sum(sub_result)
+    print(f"The sum of the grove coordinates is {result_p2}")
