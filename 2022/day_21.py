@@ -51,8 +51,18 @@ def solve_1(monkey, number_monkeys, math_monkeys):
 
 
 if __name__ == '__main__':
-    data = load_data('day_21')
+    data = load_data('day_21_example')
     number_monkeys, math_monkeys = parse_data(data)
 
     result = solve_1("root", number_monkeys, math_monkeys)
     print(f'Part 1 solution: {result}')
+
+    """
+    monkey root has the equality operation 
+    
+    solve(upstream_1) == solve_upstream_2
+
+    
+    
+    """
+    print(f'{solve_1(math_monkeys["root"].upstream_1, number_monkeys, math_monkeys)}')

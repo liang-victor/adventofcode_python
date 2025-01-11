@@ -1,4 +1,3 @@
-import pytest
 from day_20 import create_circular_doubly_linked_list, mix_node
 
 

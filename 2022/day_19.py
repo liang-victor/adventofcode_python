@@ -128,6 +128,9 @@ class MiningState:
         """If we have enough robots of a certain resource to build one per turn, there's no reason to build more"""
         return self.robots[resource] >= blueprint.max_cost[resource]
 
+    def enough_stocked_resource(self, resource, blueprint):
+        """As we approach the time limit, enough stock can mean there's no reason to build more robots"""
+
     def upper_limit_max_possible_geodes(self):
         """If we produce one geode robot, how many geodes will we have at the time limit?
         Numbers fit triangular sequence
